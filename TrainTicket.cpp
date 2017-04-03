@@ -1,4 +1,4 @@
-﻿// TrainTicket.cpp : Defines the entry point for the console application.
+﻿// TrainTicketSelling.cpp : Defines the entry point for the console application.
 //
 
 #include "stdafx.h"
@@ -28,7 +28,7 @@ public:
 		{
 			for (int i = 0; i < RealSeatAmout; i++)
 			{
-				CSetSpec[i] = i + 1;	
+				CSetSpec[i] = i + 1;
 			};
 		}
 		else
@@ -128,7 +128,7 @@ class PrintTree
 public:
 	PrintTree()
 	{
-		for (int i = 0; i < TotalSeat + 1 ; i++)
+		for (int i = 0; i < TotalSeat + 1; i++)
 		{
 			for (int j = 0; j < TotalStation + 1; j++)
 			{
@@ -140,7 +140,7 @@ public:
 					}
 					else
 					{
-					cout << setw(2) << right << "St" << setw(3) << right << j-1 << "-" << setw(3) << left << j;
+						cout << setw(2) << right << "St" << setw(3) << right << j - 1 << "-" << setw(3) << left << j;
 					}
 				}
 				else if (j == 0)
@@ -227,9 +227,10 @@ private:
 public:
 	vector<TicketDetails> TicketList;
 
-	void searchTree(TreeCluster TargetTree)
+	void searchTree(TreeCluster TargetTree, int TreeNo)
 	{
 		CSet* CurrentCSetList = TargetTree.getCSet();
+		CurrentTreeNo = TreeNo;
 		//TargetTree.getCLength(): Current Tree has Maximum of CMax Nodes
 		for (int i = CStart - 1; i < TargetTree.getCLength(); i++)
 		{
@@ -274,9 +275,11 @@ public:
 		Looking = TicketAmount;
 		TreeCluster CurrentTree = TreeClusterSet[CurrentStartStation];
 		CStart = InternalStation + StationStep;// Initially: InternalStation
+		CurrentTreeNo = CurrentStartStation;
 		while (1)
 		{
-			searchTree(CurrentTree);
+			searchTree(CurrentTree, CurrentTreeNo);
+			cout << "CurrentTreeNo:" << CurrentTreeNo << endl;
 			if (Found < CurrentTicketAmout)
 			{
 				StationStep++;// StationStep + 1, then CStart + 1
@@ -314,7 +317,7 @@ private:
 	CSet CJump;// TreeEndStation CJump add SeatNo
 public:
 	void setBit(int TreeNo, int CNo, int SeatNo, int Start, int End)// maximum of 3 nodes
-	{	
+	{
 		TreeStep = TreeClusterSet[TreeNo];
 		CStepJumpInterval = TreeStep.getCSet()[CNo];
 		CStepJumpInterval.deleteBit(SeatNo);
@@ -324,7 +327,7 @@ public:
 			CStep = TreeStep.getCSet()[Step - 1];
 			CStep.addBit(SeatNo);
 		}
-		Jump = CNo + 1 -(End - Start) - Step;
+		Jump = CNo + 1 - (End - Start) - Step;
 		cout << "---- Step:" << Step << ",Jump:" << Jump << ",SeatNo:" << (SeatNo + 1) << endl;
 		if (Jump > 0)
 		{
@@ -332,6 +335,10 @@ public:
 			CJump = TreeEndStation.getCSet()[Jump - 1];
 			// cout << CJump.getCSetSpec()[Jump - 1];
 			CJump.addBit(SeatNo);
+		}
+		if (Jump < 0)
+		{
+			cout << "ERROR, TreeNo: " << TreeNo << ", CNo:" << CNo << ", SeatNo" << SeatNo << ", Start:" << Start << ", End:" << End << endl;
 		}
 	}
 };
@@ -399,7 +406,7 @@ public:
 				break;
 			}
 			cout << "You Gonna Start From Station " << StartStation << ", Arrive at Station " << EndStation << ", and " << TicketAmount << " Tickets in Total" << endl;
-			cout <<"Les gar";
+			cout << "Les gar";
 			printf("\x87");
 			cout << "on chanter: H\x82l\x8Ane, Ce Train Qui S'en Va \0xBD" << endl;
 			BuyTicket BT;
@@ -471,7 +478,7 @@ int main()
 		Next = cK.getCheckingResult();
 	}
 	system("pause");
-    return 0;
+	return 0;
 }
 
 
