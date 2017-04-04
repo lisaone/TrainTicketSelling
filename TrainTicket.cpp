@@ -13,6 +13,7 @@ using namespace std;
 int TotalStation = 0;
 int TotalSeat = 0;
 int **SeatStatusMatrix;// 0:for sell 1:sold
+int EventNo = 0;// selling record
 
 class CSet
 {
@@ -211,6 +212,29 @@ public:
 	}
 };
 
+class SoldTicketLog
+{
+private:
+	int CurrentEventNo = 0;
+	TicketDetails CurrentTD;
+public:
+	void addSoldTicket(TicketDetails TD)
+	{
+		CurrentEventNo = EventNo++;
+		CurrentTD = TD;
+	}
+	int getEventNo()
+	{
+		return CurrentEventNo;
+	}
+	TicketDetails getTicketDetails()
+	{
+		return CurrentTD;
+	}
+};
+
+vector<SoldTicketLog> SoldTicketLogList;// sold tickets
+
 class BuyTicket
 {
 private:
@@ -341,6 +365,12 @@ public:
 			cout << "ERROR, TreeNo: " << TreeNo << ", CNo:" << CNo << ", SeatNo" << SeatNo << ", Start:" << Start << ", End:" << End << endl;
 		}
 	}
+	void refundBit(int TreeNo, int CNo, int SeatNo)// TreeNo, CNo add SeatNo
+	{
+		TreeCluster TC = TreeClusterSet[TreeNo];
+		CSet RCSet = TC.getCSet()[CNo];
+		RCSet.addBit(SeatNo);
+	}
 };
 
 class UpdateMatrix
@@ -351,6 +381,13 @@ public:
 		for (int i = Start; i < End; i++)
 		{
 			SeatStatusMatrix[SeatNo][i] = 1;
+		}
+	}
+	void setRefundTicket(int Start, int End, int SeatNo)
+	{
+		for (int i = Start; i < End; i++)
+		{
+			SeatStatusMatrix[SeatNo][i] = 0;
 		}
 	}
 };
@@ -366,7 +403,7 @@ public:
 	bool getCheckingResult()
 	{
 		bool Next = 1;
-		cout << "Please Select an Operation" << endl << "1: Show Current Seat Status" << endl << "2: Buy Tickets" << endl << "3: Exit" << endl;
+		cout << "Please Select an Operation" << endl << "1: Show Current Seat Status" << endl << "2: Buy Tickets" << endl << "3: Refund" << endl << "4: Exit" << endl;
 		cin >> Operation;
 		switch (Operation)
 		{
@@ -427,6 +464,12 @@ public:
 						UT.setBit(TD[i].getTreeNo(), TD[i].getCNo(), TD[i].getSeatNo(), StartStation, EndStation);
 						UpdateMatrix UM;
 						UM.setSoldTicket(StartStation, EndStation, TD[i].getSeatNo());
+						SoldTicketLog STL;
+						TicketDetails ActualTD;
+						ActualTD.setSold(StartStation, EndStation - StartStation - 1, TD[i].getSeatNo());
+						STL.addSoldTicket(ActualTD);
+						cout << "The Ticket Sold Event No. is:" << STL.getEventNo() << ", Please Keep this Number for Refund." << endl;
+						SoldTicketLogList.push_back(STL);
 					}
 				}
 				else
@@ -437,6 +480,107 @@ public:
 			break;
 		}
 		case 3:
+		{
+			int EventNumber = 0;
+			cout << "Please Enter the Event Number of the Refund Ticket:";
+			cin >> EventNumber;
+			if (!(EventNumber > EventNo))
+			{
+				SoldTicketLog CurrentSTL = SoldTicketLogList[EventNumber];
+				if (EventNumber == CurrentSTL.getEventNo())
+				{
+					TicketDetails TD = CurrentSTL.getTicketDetails();
+					cout << "Refunding..." << endl;
+					cout << "Ticket came from:" << endl << setw(8) << left << "TNo. " << TD.getTreeNo() << endl << setw(8) << left << "CNo." << (TD.getCNo() + 1) << endl << setw(8) << left << "SeatNo." << (TD.getSeatNo() + 1) << endl;
+					// A B C
+					// A + B update A- & A+
+					// A + B + C update A- & A+ C-
+					// B + C update B+ C-
+					// B update B+
+					int RSeatNo = TD.getSeatNo();
+					int RStartStation = TD.getTreeNo();//startStation
+					int REndStation = RStartStation + TD.getCNo() + 1;// endStation: start + cno(from 0) + 1
+					boolean StartAvailable = false;
+					boolean EndAvailable = false;
+					int RStartStep = 0;// tree RStartStation, C RStartCNo
+					int REndStep = 0;// tree REndStation, C REndCNo
+					if (RStartStation != 0 && SeatStatusMatrix[RSeatNo][RStartStation - 1] == 0)// former for sell
+					{
+						StartAvailable = true;
+						for (int i = RStartStation - 1; i > -1; i--)
+						{
+							if (SeatStatusMatrix[RSeatNo][i] == 0)
+							{
+								RStartStep++;
+							}
+							else
+							{
+								break;// continuously
+							}
+						}
+					}
+					if (REndStation < TotalStation && SeatStatusMatrix[RSeatNo][REndStation] == 0)// latter for sell
+					{
+						EndAvailable = true;
+						for (int i = REndStation; i < TotalStation; i++)
+						{
+							if (SeatStatusMatrix[RSeatNo][i] == 0)
+							{
+								REndStep++;
+							}
+							else
+							{
+								break;// continuously
+							}
+						}
+					}
+					// UP Tree
+					cout << "RStartStation:" << RStartStation << ",REndStation:" << REndStation << ",StartAvailable:" << int(StartAvailable) << ", EndAvailable:" << int(EndAvailable) << ", RStartStep:" << RStartStep << ", REndStep:" << REndStep << endl;
+					if (!StartAvailable)
+					{
+						if (!EndAvailable)// B update B+
+						{
+							UpdateTree UT;
+							UT.refundBit(RStartStation, TD.getCNo(), RSeatNo);
+						}
+						else// B + C update B+ C-
+						{
+							UpdateTree UTB;
+							UTB.refundBit(RStartStation, TD.getCNo() + REndStep, RSeatNo);
+							UpdateTree UTC;
+							UTC.setBit(REndStation, REndStep - 1, RSeatNo, REndStation, REndStation + REndStep);
+						}
+					}
+					else
+					{
+						if (!EndAvailable)// A + B update A- & A+
+						{
+							UpdateTree UTA;
+							UTA.setBit(RStartStation - RStartStep, RStartStep - 1, RSeatNo, RStartStation - RStartStep, RStartStation);
+							UTA.refundBit(RStartStation - RStartStep, TD.getCNo() + RStartStep, RSeatNo);
+						}
+						else// A + B + C update A- & A+ C-
+						{
+							UpdateTree UTA;
+							UTA.setBit(RStartStation - RStartStep, RStartStep - 1, RSeatNo, RStartStation - RStartStep, RStartStation);
+							UTA.refundBit(RStartStation - RStartStep, TD.getCNo() + RStartStep + REndStep, RSeatNo);
+							UpdateTree UTC;
+							UTC.setBit(REndStation, REndStep - 1, RSeatNo, REndStation, REndStation + REndStep);
+							cout << REndStation << ":" << REndStep - 1 << " clear" << endl;
+						}
+					}
+					UpdateMatrix UM;
+					UM.setRefundTicket(RStartStation, REndStation, RSeatNo);
+				}
+				else
+				{
+					cout << "Event No. Error." << endl;// should not occur
+					break;
+				}
+			}
+			break;
+		}
+		case 4:
 		{
 			Next = 0;
 			cout << "BYE" << endl;
